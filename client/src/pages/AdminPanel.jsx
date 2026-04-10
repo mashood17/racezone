@@ -7,11 +7,10 @@ import SessionManager from '../components/admin/SessionManager'
 import DriverSetup from '../components/admin/DriverSetup'
 import LapEntry from '../components/admin/LapEntry'
 import RaceControl from '../components/admin/RaceControl'
+import HallOfFameAdmin from '../components/admin/HallOfFameAdmin'
+import ShareCard from '../components/display/ShareCard'
 
-
-const TABS = ['SESSION', 'DRIVERS', 'LAPS', 'CONTROL']
-
-
+const TABS = ['SESSION', 'DRIVERS', 'LAPS', 'CONTROL', 'HOF']
 
 export default function AdminPanel() {
   const { token, logout } = useAuth()
@@ -22,11 +21,9 @@ export default function AdminPanel() {
 
   const [activeTab, setActiveTab] = useState('SESSION')
   const [loading, setLoading] = useState(true)
+  const [showShareCard, setShowShareCard] = useState(false)
 
   const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
-
-
-  
 
   useEffect(() => {
     const load = async () => {
@@ -54,10 +51,7 @@ export default function AdminPanel() {
     }
   }
 
-
-
   const handleRaceCreated = (race) => {
-    console.log('Race created:', race)
     if (race && race.id) {
       setActiveRace(race)
       setRaceStatus('waiting')
@@ -101,7 +95,6 @@ export default function AdminPanel() {
   }
 
   return (
-  <>
     <div className="min-h-screen bg-darkbg flex flex-col max-w-lg mx-auto">
 
       {/* TOP BAR */}
@@ -156,6 +149,7 @@ export default function AdminPanel() {
             {tab === 'DRIVERS' && '🏎️ '}
             {tab === 'LAPS' && '⏱️ '}
             {tab === 'CONTROL' && '🎮 '}
+            {tab === 'HOF' && '🏆 '}
             {tab}
           </button>
         ))}
@@ -192,7 +186,8 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <a href="/"
+            <a
+              href="/"
               target="_blank"
               rel="noreferrer"
               className="block w-full py-3 border border-darkborder text-gray-400 hover:text-white hover:border-gray-500 text-center rounded-lg text-sm transition-all"
@@ -223,31 +218,6 @@ export default function AdminPanel() {
             )}
           </div>
         )}
-
-        {/* Keyboard Guide */}
-        <div className="bg-darkcard border border-green-500/30 rounded-lg p-4 mb-4">
-          <div className="text-green-400 text-xs font-bold tracking-widest mb-3">
-            ⌨️ KEYBOARD LAP LOGGING — ACTIVE
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {entries.slice(0, 4).map((entry, i) => (
-              <div key={entry.id} className="text-center">
-                <div
-                  className="text-2xl font-black font-mono rounded-lg py-2 mb-1 border-2"
-                  style={{ borderColor: entry.color, color: entry.color }}
-                >
-                  {i + 1}
-                </div>
-                <div className="text-white text-xs font-bold truncate">{entry.name}</div>
-                <div className="text-gray-500 text-xs">Lap {entry.lap_count || 0}</div>
-              </div>
-            ))}
-          </div>
-          <div className="text-gray-600 text-xs mt-3 text-center">
-            Press key 1-4 when driver crosses finish line
-          </div>
-        </div>
-        
 
         {/* LAPS TAB */}
         {activeTab === 'LAPS' && (
@@ -287,7 +257,7 @@ export default function AdminPanel() {
 
         {/* CONTROL TAB */}
         {activeTab === 'CONTROL' && (
-          <div>
+          <div className="space-y-3">
             {!activeRace ? (
               <div className="text-center py-12">
                 <div className="text-4xl mb-3">🎮</div>
@@ -298,20 +268,47 @@ export default function AdminPanel() {
                 </button>
               </div>
             ) : (
-              <RaceControl
-                race={activeRace}
-                raceStatus={raceStatus}
-                token={token}
-                socket={socket}
-                onStatusChange={handleStatusChange}
-              />
+              <>
+                <RaceControl
+                  race={activeRace}
+                  raceStatus={raceStatus}
+                  token={token}
+                  socket={socket}
+                  onStatusChange={handleStatusChange}
+                />
+
+                {/* Share card button — only after race ends */}
+                {(raceStatus === 'completed' || raceStatus === 'podium') && entries.length > 0 && (
+                  <button
+                    onClick={() => setShowShareCard(true)}
+                    className="w-full py-3 bg-darkcard border border-f1red text-f1red hover:bg-f1red hover:text-white font-bold font-race tracking-widest rounded-lg transition-all"
+                  >
+                    📸 SHARE CARDS
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
+
+        {/* HOF TAB */}
+        {activeTab === 'HOF' && (
+          <HallOfFameAdmin />
+        )}
+
       </div>
 
       <div className="h-4 bg-darkbg" />
+
+      {/* Share Card Modal */}
+      {showShareCard && (
+        <ShareCard
+          entries={entries}
+          activeRace={activeRace}
+          onClose={() => setShowShareCard(false)}
+        />
+      )}
+
     </div>
-   </>
   )
 }

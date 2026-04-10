@@ -52,7 +52,11 @@ export default function LapEntry({ entries, token, onLapLogged, totalLaps }) {
           lap_time_ms: now,
         }),
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error || 'Unknown error')
+        return
+      }
       const lapData = await res.json()
 
       // Refresh entries to get updated data

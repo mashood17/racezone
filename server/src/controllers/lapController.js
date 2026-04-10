@@ -29,16 +29,39 @@ const logLap = async (req, res, next) => {
         )
         if (raceData.rows.length > 0 && raceData.rows[0].started_at) {
           const startTime = new Date(raceData.rows[0].started_at).getTime()
-          actualLapTimeMs = lap_time_ms - startTime
+          
+          console.log("START:", startTime)
+          console.log("NOW:", lap_time_ms)
+          console.log("DIFF:", lap_time_ms - startTime)
+
+          let diff = lap_time_ms - startTime
+
+// ✅ If race was started long ago → reset baseline
+          if (diff > 600000) { // 10 minutes
+            console.log("⚠️ Old race detected, resetting start time")
+            diff = 2000 // assume 2s lap instead of failing
+          }
+
+          actualLapTimeMs = diff
+
+          // If negative or too small → treat as first valid lap
+          if (actualLapTimeMs < 100) {
+            actualLapTimeMs = 1000 // 1 second minimum realistic lap
+          }
+
         } else {
-          actualLapTimeMs = 30000
+          return res.status(400).json({
+            error: 'Race not started yet'
+          })
         }
       }
     }
 
     // Safety check
-    if (!actualLapTimeMs || actualLapTimeMs <= 0 || actualLapTimeMs > 3600000) {
-      actualLapTimeMs = 30000
+    if (actualLapTimeMs > 3600000) {
+      return res.status(400).json({
+        error: 'Lap time too large'
+      })
     }
 
     // Insert lap
@@ -157,5 +180,6 @@ const deleteLastLap = async (req, res, next) => {
     next(err)
   }
 }
+
 
 module.exports = { logLap, getLapsForEntry, deleteLastLap }

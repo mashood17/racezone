@@ -5,6 +5,7 @@ import { calculateGaps, findFastestLap } from '../utils/calcGaps'
 import { formatLapTime, formatCountdown } from '../utils/formatTime'
 import { POSITION_COLORS } from '../utils/constants'
 import { QRCodeSVG } from 'qrcode.react'
+import ShareCard from '../components/display/ShareCard'
 
 // Speed lines component
 const SpeedLines = ({ active }) => {
@@ -74,6 +75,7 @@ export default function DisplayScreen() {
   const [flashStart, setFlashStart] = useState(false)
   const [prevPositions, setPrevPositions] = useState({})
   const [positionChanges, setPositionChanges] = useState({})
+  const [showShareCard, setShowShareCard] = useState(false)
   const timerRef = useRef(null)
   const now = new Date()
 
@@ -244,6 +246,15 @@ export default function DisplayScreen() {
             🏁 RACEZONE RC RACING — BOOK YOUR RACE TODAY — racezone.in — 🏎️ THE ULTIMATE RC RACING EXPERIENCE 🏁
           </div>
         </div>
+
+        {/* Share Card Modal */}
+        {showShareCard && (
+          <ShareCard
+            entries={entries}
+            activeRace={activeRace}
+            onClose={() => setShowShareCard(false)}
+          />
+        )}
       </div>
     )
   }
@@ -545,12 +556,15 @@ export default function DisplayScreen() {
             ) : (
               <div className="space-y-2">
                 {hallOfFame.slice(0, 5).map((record, i) => (
-                  <div key={i} className="flex items-center justify-between py-1 border-b border-darkborder last:border-0">
+                  <div key={record.id} className="flex items-center justify-between py-1 border-b border-darkborder last:border-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
-                      <span className="text-white text-sm font-bold">{record.name}</span>
+                      <div>
+                        <div className="text-white text-sm font-bold">{record.name}</div>
+                        <div className="text-gray-600 text-xs truncate">{record.venue_name}</div>
+                      </div>
                     </div>
-                    <span className="text-f1purple font-mono text-sm font-bold">
+                    <span className="text-f1purple font-mono text-sm font-bold flex-shrink-0 ml-2">
                       {formatLapTime(record.lap_time_ms)}
                     </span>
                   </div>
@@ -606,6 +620,18 @@ export default function DisplayScreen() {
           </div>
         </div>
       </div>
+      
+      {/* Share button — shows after race */}
+      {(raceStatus === 'completed' || raceStatus === 'podium') && entries.length > 0 && (
+        <div className="relative z-10 flex justify-center py-3 border-t border-darkborder">
+          <button
+            onClick={() => setShowShareCard(true)}
+            className="px-8 py-3 bg-f1red hover:bg-red-700 text-white font-black font-race text-lg tracking-widest rounded-full transition-all glow-red animate-pulse"
+          >
+            📸 SHARE YOUR RESULT
+          </button>
+        </div>
+      )}
 
       {/* ── BOTTOM TICKER ── */}
       <div className="relative z-10 border-t border-darkborder overflow-hidden"

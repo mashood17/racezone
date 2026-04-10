@@ -100,21 +100,62 @@ const addDriverToRace = async (req, res, next) => {
 const getHallOfFame = async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT l.lap_time_ms, d.name, d.avatar, d.car_number, r.venue_name, r.created_at
+      `SELECT 
+         l.id,
+         l.lap_time_ms,
+         l.created_at,
+         d.name,
+         d.avatar,
+         d.car_number,
+         d.color,
+         r.venue_name
        FROM laps l
        JOIN race_entries re ON l.race_entry_id = re.id
        JOIN drivers d ON re.driver_id = d.id
        JOIN races r ON re.race_id = r.id
        ORDER BY l.lap_time_ms ASC
-       LIMIT 10`
-    );
-    res.json(result.rows);
+       LIMIT 5`
+    )
+    res.json(result.rows)
   } catch (err) {
-    next(err);
+    next(err)
   }
-};
+}
+
+// DELETE single hall of fame entry
+const deleteHallOfFameEntry = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    await pool.query('DELETE FROM laps WHERE id = $1', [id])
+    res.json({ message: 'Entry deleted' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// DELETE all hall of fame (reset)
+const resetHallOfFame = async (req, res, next) => {
+  try {
+    // Only delete laps that are in top 5
+    await pool.query(`
+      DELETE FROM laps
+      WHERE id IN (
+        SELECT l.id FROM laps l
+        JOIN race_entries re ON l.race_entry_id = re.id
+        JOIN drivers d ON re.driver_id = d.id
+        JOIN races r ON re.race_id = r.id
+        ORDER BY l.lap_time_ms ASC
+        LIMIT 5
+      )
+    `)
+    res.json({ message: 'Hall of Fame reset' })
+  } catch (err) {
+    next(err)
+  }
+}
 
 module.exports = {
   getAllRaces, getActiveRace, getRaceDetail,
-  createRace, updateRaceStatus, addDriverToRace, getHallOfFame
+  createRace, updateRaceStatus, addDriverToRace, getHallOfFame, 
+  deleteHallOfFameEntry, resetHallOfFame
 };

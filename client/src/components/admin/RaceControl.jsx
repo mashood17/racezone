@@ -33,19 +33,24 @@ export default function RaceControl({ race, raceStatus, token, socket, onStatusC
   const handleStartRace = async () => {
     if (!race) return
     try {
+      // ✅ FIRST update backend
+      await fetch(`${API}/races/${race.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          status: 'active', 
+          started_at: new Date().toISOString() 
+        }),
+      })
+
       socket?.emit('race_start', { race_id: race.id })
-      setTimeout(async () => {
-        await fetch(`${API}/races/${race.id}/status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: 'active', started_at: new Date().toISOString() }),
-        })
-        onStatusChange('active')
-        setRunning(true)
-      }, 4000)
+
+      onStatusChange('active')
+      setRunning(true)
+
     } catch (err) {
       alert('Error starting race: ' + err.message)
     }
