@@ -1,0 +1,32 @@
+export const themes = {
+  night: {
+    name: 'Night Race',
+    bg: '#0a0a0f',
+    card: '#12121a',
+    border: '#1e1e2e',
+    accent: '#e10600',
+    text: '#ffffff',
+    subtext: '#8888aa',
+    fastest: '#9b59b6',
+  },
+  classic: {
+    name: 'Classic',
+    bg: '#1a1a2e',
+    card: '#16213e',
+    border: '#0f3460',
+    accent: '#e94560',
+    text: '#eaeaea',
+    subtext: '#8899aa',
+    fastest: '#00d2be',
+  },
+  neon: {
+    name: 'Neon City',
+    bg: '#050510',
+    card: '#0d0d1f',
+    border: '#00ff88',
+    accent: '#00ff88',
+    text: '#ffffff',
+    subtext: '#66ffaa',
+    fastest: '#ff00ff',
+  },
+}
