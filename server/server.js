@@ -15,34 +15,48 @@ const raceSocket = require('./src/socket/raceSocket');
 const app = express();
 const httpServer = http.createServer(app);
 
-// Socket.io setup
+// ── CORS ──
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://racezone-hrwxtj4ny-mashood17s-projects.vercel.app',
+  'https://racezone-9e9cdikkk-mashood17s-projects.vercel.app',
+  process.env.CLIENT_URL,
+].filter(Boolean)
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+}))
+
+app.use(express.json());
+
+// ── Socket.io ──
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
 
-// Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
-app.use(express.json());
-
-// Routes
+// ── Routes ──
 app.use('/api/auth', authRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/races', raceRoutes);
 app.use('/api/laps', lapRoutes);
 
-// Health check
 app.get('/health', (req, res) => res.json({ status: 'RaceZone server running 🏁' }));
 
-// Error handler (must be last)
 app.use(errorHandler);
 
-// Socket.io
 raceSocket(io);
 
-// Database schema init + server start
+// ── Database Init ──
 const initDB = async () => {
   try {
     await pool.query(`
@@ -60,6 +74,7 @@ const initDB = async () => {
         venue_name VARCHAR(200) DEFAULT 'RaceZone Arena',
         venue_logo_url TEXT,
         duration_seconds INTEGER DEFAULT 180,
+        total_laps INTEGER DEFAULT NULL,
         status VARCHAR(20) DEFAULT 'waiting',
         started_at TIMESTAMP,
         ended_at TIMESTAMP,
@@ -84,63 +99,18 @@ const initDB = async () => {
         lap_time_ms INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-
-      
-        CREATE TABLE IF NOT EXISTS drivers (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          avatar VARCHAR(10) DEFAULT '🏎️',
-          car_number VARCHAR(5) DEFAULT '00',
-          color VARCHAR(20) DEFAULT '#e10600',
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS races (
-          id SERIAL PRIMARY KEY,
-          venue_name VARCHAR(200) DEFAULT 'RaceZone Arena',
-          venue_logo_url TEXT,
-          duration_seconds INTEGER DEFAULT 180,
-          total_laps INTEGER DEFAULT NULL,
-          race_mode VARCHAR(10) DEFAULT 'time',
-          status VARCHAR(20) DEFAULT 'waiting',
-          started_at TIMESTAMP,
-          ended_at TIMESTAMP,
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS race_entries (
-          id SERIAL PRIMARY KEY,
-          race_id INTEGER REFERENCES races(id) ON DELETE CASCADE,
-          driver_id INTEGER REFERENCES drivers(id) ON DELETE CASCADE,
-          position INTEGER DEFAULT 0,
-          lap_count INTEGER DEFAULT 0,
-          best_lap_ms INTEGER,
-          total_time_ms INTEGER DEFAULT 0,
-          finished_at TIMESTAMP DEFAULT NULL,
-          finish_position INTEGER DEFAULT NULL,
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS laps (
-          id SERIAL PRIMARY KEY,
-          race_entry_id INTEGER REFERENCES race_entries(id) ON DELETE CASCADE,
-          lap_number INTEGER NOT NULL,
-          lap_time_ms INTEGER NOT NULL,
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-      
-    `);
-    console.log('✅ Database schema ready');
+    `)
+    console.log('✅ Database schema ready')
   } catch (err) {
-    console.error('❌ DB init failed:', err);
-    process.exit(1);
+    console.error('❌ DB init failed:', err)
+    process.exit(1)
   }
-};
+}
 
 const PORT = process.env.PORT || 4000;
 
 initDB().then(() => {
   httpServer.listen(PORT, () => {
-    console.log(`🚀 RaceZone server running on port ${PORT}`);
-  });
-});
+    console.log(`🚀 RaceZone server running on port ${PORT}`)
+  })
+})
