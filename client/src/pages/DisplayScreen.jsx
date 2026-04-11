@@ -5,9 +5,27 @@ import { calculateGaps, findFastestLap } from '../utils/calcGaps'
 import { formatLapTime, formatCountdown } from '../utils/formatTime'
 import { POSITION_COLORS } from '../utils/constants'
 import { QRCodeSVG } from 'qrcode.react'
+import { themes } from '../styles/themes'
+import ThemeSwitcher from '../components/shared/ThemeSwitcher'
 import ShareCard from '../components/display/ShareCard'
+import DriverOfTheDay from '../components/display/DriverOfTheDay'
 
-// Speed lines component
+const AnimatedNumber = ({ value }) => {
+  const [display, setDisplay] = useState(value)
+  const [flip, setFlip] = useState(false)
+  useEffect(() => {
+    if (value !== display) {
+      setFlip(true)
+      setTimeout(() => { setDisplay(value); setFlip(false) }, 150)
+    }
+  }, [value])
+  return (
+    <span className={flip ? 'number-flip' : ''} style={{ display: 'inline-block' }}>
+      {display}
+    </span>
+  )
+}
+
 const SpeedLines = ({ active }) => {
   const [lines, setLines] = useState([])
   useEffect(() => {
@@ -22,48 +40,20 @@ const SpeedLines = ({ active }) => {
     const timer = setTimeout(() => setLines([]), 1500)
     return () => clearTimeout(timer)
   }, [active])
-
   return (
     <>
       {lines.map(line => (
-        <div
-          key={line.id}
-          className="speed-line"
-          style={{
-            top: `${line.top}%`,
-            width: `${line.width}px`,
-            animationDelay: `${line.delay}s`,
-          }}
-        />
+        <div key={line.id} className="speed-line"
+          style={{ top: `${line.top}%`, width: `${line.width}px`, animationDelay: `${line.delay}s` }} />
       ))}
     </>
-  )
-}
-
-// Animated number component
-const AnimatedNumber = ({ value }) => {
-  const [display, setDisplay] = useState(value)
-  const [flip, setFlip] = useState(false)
-  useEffect(() => {
-    if (value !== display) {
-      setFlip(true)
-      setTimeout(() => {
-        setDisplay(value)
-        setFlip(false)
-      }, 150)
-    }
-  }, [value])
-  return (
-    <span className={flip ? 'number-flip' : ''} style={{ display: 'inline-block' }}>
-      {display}
-    </span>
   )
 }
 
 export default function DisplayScreen() {
   const { activeRace, entries, setEntries, raceStatus, setRaceStatus,
     hallOfFame, fetchHallOfFame, raceHistory, fetchRaceHistory,
-    fetchActiveRace } = useRace()
+    fetchActiveRace, theme } = useRace()
 
   const socket = useSocket()
   const [countdown, setCountdown] = useState(null)
@@ -72,11 +62,12 @@ export default function DisplayScreen() {
   const [timerRunning, setTimerRunning] = useState(false)
   const [showPodium, setShowPodium] = useState(false)
   const [speedLines, setSpeedLines] = useState(false)
-  const [flashStart, setFlashStart] = useState(false)
   const [prevPositions, setPrevPositions] = useState({})
   const [positionChanges, setPositionChanges] = useState({})
   const [showShareCard, setShowShareCard] = useState(false)
   const timerRef = useRef(null)
+
+  const t = themes[theme] || themes.f1blue
   const now = new Date()
 
   useEffect(() => {
@@ -85,17 +76,15 @@ export default function DisplayScreen() {
     fetchRaceHistory()
   }, [])
 
-  // Race timer
   useEffect(() => {
     if (timerRunning) {
-      timerRef.current = setInterval(() => setRaceTimer(t => t + 1), 1000)
+      timerRef.current = setInterval(() => setRaceTimer(prev => prev + 1), 1000)
     } else {
       clearInterval(timerRef.current)
     }
     return () => clearInterval(timerRef.current)
   }, [timerRunning])
 
-  // Track position changes for animations
   useEffect(() => {
     if (entries.length === 0) return
     const changes = {}
@@ -109,32 +98,25 @@ export default function DisplayScreen() {
       setPositionChanges(changes)
       setTimeout(() => setPositionChanges({}), 1000)
     }
-    const newPositions = {}
-    entries.forEach(e => { newPositions[e.id] = e.position })
-    setPrevPositions(newPositions)
+    const newPos = {}
+    entries.forEach(e => { newPos[e.id] = e.position })
+    setPrevPositions(newPos)
   }, [entries])
 
-  // Socket listeners
   useEffect(() => {
     if (!socket) return
     if (activeRace?.id) socket.emit('join_race', activeRace.id)
 
-    socket.on('leaderboard_update', (data) => {
-      setEntries(data.entries || [])
-    })
+    socket.on('leaderboard_update', (data) => setEntries(data.entries || []))
 
     socket.on('race_started', () => {
       setShowPodium(false)
       setRaceTimer(0)
       setSpeedLines(true)
-      setFlashStart(true)
       setTimeout(() => setSpeedLines(false), 1500)
-      setTimeout(() => setFlashStart(false), 1000)
-
       let c = 3
       setCountdown(c)
       setCountdownKey(k => k + 1)
-
       const cd = setInterval(() => {
         c--
         if (c <= 0) {
@@ -152,15 +134,8 @@ export default function DisplayScreen() {
       }, 1000)
     })
 
-    socket.on('race_ended', () => {
-      setRaceStatus('completed')
-      setTimerRunning(false)
-    })
-
-    socket.on('podium_show', () => {
-      setShowPodium(true)
-      setRaceStatus('podium')
-    })
+    socket.on('race_ended', () => { setRaceStatus('completed'); setTimerRunning(false) })
+    socket.on('podium_show', () => { setShowPodium(true); setRaceStatus('podium') })
 
     return () => {
       socket.off('leaderboard_update')
@@ -178,118 +153,63 @@ export default function DisplayScreen() {
   const statusConfig = {
     waiting:   { label: '⏳ WAITING TO START', color: '#FFD700' },
     active:    { label: '🟢 RACE IN PROGRESS', color: '#00ff88' },
-    completed: { label: '🏁 RACE COMPLETE',    color: '#e10600' },
+    completed: { label: '🏁 RACE COMPLETE',    color: t.accent },
     podium:    { label: '🏆 PODIUM',           color: '#FFD700' },
   }
   const status = statusConfig[raceStatus] || statusConfig.waiting
 
-  // ── PODIUM SCREEN ──
+  // ── PODIUM ──
   if (showPodium && entries.length >= 2) {
     const sorted = [...entries].sort((a, b) => (a.position || 99) - (b.position || 99))
     const podiumOrder = [sorted[1], sorted[0], sorted[2]].filter(Boolean)
-    const heights = ['h-44', 'h-56', 'h-36']
+    const heights = ['180px', '220px', '140px']
     const medals = ['🥈', '🥇', '🥉']
     const labels = ['P2', 'P1', 'P3']
     const podiumColors = ['#C0C0C0', '#FFD700', '#CD7F32']
 
     return (
-      <div className="min-h-screen bg-darkbg flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="bg-grid absolute inset-0" />
-        <div className="scan-line" />
+      <div style={{ minHeight: '100vh', backgroundColor: t.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', fontFamily: 'Rajdhani, sans-serif' }}>
+        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at center, ${t.accent}15 0%, transparent 70%)` }} />
 
-        {/* Radial glow */}
-        <div className="absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse at center, rgba(255,215,0,0.08) 0%, transparent 70%)' }} />
-
-        <div className="text-center mb-10 z-10 fade-in">
-          <div className="text-7xl mb-4 text-glow-gold">🏆</div>
-          <h1 className="text-8xl font-black font-race text-f1gold tracking-widest text-glow-gold">
-            PODIUM
-          </h1>
-          <p className="text-gray-400 text-2xl mt-3 tracking-widest">
-            {activeRace?.venue_name || 'RaceZone Arena'}
-          </p>
+        <div style={{ textAlign: 'center', marginBottom: '48px', position: 'relative', zIndex: 10 }}>
+          <div style={{ fontSize: '72px', marginBottom: '16px' }}>🏆</div>
+          <div style={{ fontSize: '80px', fontWeight: 900, color: '#FFD700', letterSpacing: '8px', textShadow: '0 0 40px rgba(255,215,0,0.6)', fontFamily: 'Rajdhani, sans-serif' }}>PODIUM</div>
+          <div style={{ color: t.subtext, fontSize: '22px', marginTop: '8px', letterSpacing: '4px' }}>{activeRace?.venue_name || 'RaceZone Arena'}</div>
         </div>
 
-        <div className="flex items-end gap-8 z-10 mb-16">
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '32px', position: 'relative', zIndex: 10, marginBottom: '60px' }}>
           {podiumOrder.map((entry, i) => (
-            <div
-              key={entry?.id}
-              className="flex flex-col items-center gap-3 podium-rise"
-              style={{ animationDelay: `${i * 0.2}s` }}
-            >
-              <div className="text-6xl">{entry?.avatar || '🏎️'}</div>
-              <div className="text-3xl font-black text-white font-race">{entry?.name}</div>
-              <div className="text-sm text-gray-400 font-mono">
-                Best: {formatLapTime(entry?.best_lap_ms)}
-              </div>
-              <div className="text-sm text-gray-400 font-mono">
-                Total: {formatLapTime(entry?.total_time_ms)}
-              </div>
-              <div
-                className={`${heights[i]} w-40 flex flex-col items-center justify-start pt-6 rounded-t-xl`}
-                style={{
-                  backgroundColor: podiumColors[i],
-                  boxShadow: `0 0 30px ${podiumColors[i]}66`
-                }}
-              >
-                <div className="text-5xl">{medals[i]}</div>
-                <div className="text-3xl font-black text-black mt-2">{labels[i]}</div>
+            <div key={entry?.id} className="podium-rise" style={{ animationDelay: `${i * 0.2}s`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontSize: '56px' }}>{entry?.avatar || '🏎️'}</div>
+              <div style={{ fontSize: '28px', fontWeight: 900, color: t.text, fontFamily: 'Rajdhani, sans-serif' }}>{entry?.name}</div>
+              <div style={{ color: t.subtext, fontSize: '14px', fontFamily: 'monospace' }}>Best: {formatLapTime(entry?.best_lap_ms)}</div>
+              <div style={{ color: t.subtext, fontSize: '14px', fontFamily: 'monospace' }}>Total: {formatLapTime(entry?.total_time_ms)}</div>
+              <div style={{ height: heights[i], width: '160px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: '24px', borderRadius: '12px 12px 0 0', backgroundColor: podiumColors[i], boxShadow: `0 0 30px ${podiumColors[i]}66` }}>
+                <div style={{ fontSize: '48px' }}>{medals[i]}</div>
+                <div style={{ fontSize: '28px', fontWeight: 900, color: '#000' }}>{labels[i]}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Bottom ticker */}
-        <div className="fixed bottom-0 left-0 right-0 bg-f1red/90 py-2 overflow-hidden z-20">
-          <div className="ticker-content text-white font-race font-bold tracking-widest text-sm">
-            🏁 RACEZONE RC RACING — BOOK YOUR RACE TODAY — racezone.in — 🏎️ THE ULTIMATE RC RACING EXPERIENCE 🏁
-          </div>
+        <div style={{ color: t.subtext, fontSize: '18px', letterSpacing: '6px', fontFamily: 'Rajdhani, sans-serif', fontWeight: 700 }}>
+          RACEZONE RC RACING EXPERIENCE
         </div>
-
-        {/* Share Card Modal */}
-        {showShareCard && (
-          <ShareCard
-            entries={entries}
-            activeRace={activeRace}
-            onClose={() => setShowShareCard(false)}
-          />
-        )}
       </div>
     )
   }
 
-  // ── COUNTDOWN SCREEN ──
+  // ── COUNTDOWN ──
   if (countdown !== null) {
     return (
-      <div className="min-h-screen bg-darkbg flex items-center justify-center relative overflow-hidden">
-        <div className="bg-grid absolute inset-0" />
+      <div style={{ minHeight: '100vh', backgroundColor: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
         <SpeedLines active={speedLines} />
-
-        {flashStart && <div className="fixed inset-0 bg-white/10 race-start-flash z-10" />}
-
-        <div className="absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse at center, rgba(225,6,0,0.15) 0%, transparent 60%)' }} />
-
-        <div className="text-center z-10">
-          {countdown === 0 ? (
-            <div
-              key="go"
-              className="font-black font-race text-green-400 text-glow-red countdown-number"
-              style={{ fontSize: '18rem', lineHeight: 1 }}
-            >
-              GO!
-            </div>
-          ) : (
-            <div
-              key={countdownKey}
-              className="font-black font-race text-f1red text-glow-red countdown-number"
-              style={{ fontSize: '20rem', lineHeight: 1 }}
-            >
-              {countdown}
-            </div>
-          )}
-          <div className="text-gray-400 text-2xl tracking-widest mt-4 font-race">
+        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at center, ${t.accent}20 0%, transparent 60%)` }} />
+        <div style={{ textAlign: 'center', position: 'relative', zIndex: 10 }}>
+          <div key={countdownKey} className="countdown-number" style={{ fontSize: '20rem', lineHeight: 1, fontWeight: 900, fontFamily: 'Rajdhani, sans-serif', color: countdown === 0 ? '#00ff88' : t.accent, textShadow: `0 0 60px ${countdown === 0 ? '#00ff88' : t.accent}` }}>
+            {countdown === 0 ? 'GO!' : countdown}
+          </div>
+          <div style={{ color: t.subtext, fontSize: '24px', letterSpacing: '6px', marginTop: '16px', fontFamily: 'Rajdhani, sans-serif' }}>
             {activeRace?.venue_name || 'RACEZONE'}
           </div>
         </div>
@@ -299,188 +219,144 @@ export default function DisplayScreen() {
 
   // ── MAIN DISPLAY ──
   return (
-    <div className="min-h-screen bg-darkbg flex flex-col overflow-hidden relative">
-      {/* Background grid */}
-      <div className="bg-grid absolute inset-0 pointer-events-none" />
-
-      {/* Scan line */}
+    <div style={{ minHeight: '100vh', backgroundColor: t.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Rajdhani, sans-serif', position: 'relative', overflow: 'hidden' }}>
+      <SpeedLines active={speedLines} />
       <div className="scan-line" />
 
-      {/* Speed lines */}
-      <SpeedLines active={speedLines} />
-
-      {/* Ambient glow top */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-f1red glow-red" />
+      {/* Top accent line */}
+      <div style={{ height: '3px', background: `linear-gradient(90deg, transparent, ${t.accent}, transparent)`, boxShadow: `0 0 20px ${t.accent}` }} />
 
       {/* ── TOP BAR ── */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-3 border-b border-darkborder"
-        style={{ background: 'rgba(18,18,26,0.95)', backdropFilter: 'blur(10px)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', borderBottom: `1px solid ${t.border}`, backgroundColor: t.card, backdropFilter: 'blur(10px)', position: 'relative', zIndex: 10 }}>
 
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="text-f1red text-3xl text-glow-red">⚡</span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: t.accent, fontSize: '28px', filter: `drop-shadow(0 0 8px ${t.accent})` }}>⚡</span>
           <div>
-            <span className="text-white text-2xl font-black tracking-widest font-race text-glow-red">
-              RACEZONE
-            </span>
-            <div className="text-gray-600 text-xs tracking-widest">RC RACING EXPERIENCE</div>
+            <div style={{ color: t.text, fontSize: '22px', fontWeight: 900, letterSpacing: '6px', lineHeight: 1, textShadow: `0 0 20px ${t.accent}44` }}>RACEZONE</div>
+            <div style={{ color: t.subtext, fontSize: '10px', letterSpacing: '3px' }}>RC RACING EXPERIENCE</div>
           </div>
-          <div className="w-px h-8 bg-darkborder mx-2" />
-          <span className="text-gray-400 text-sm tracking-wider">LIVE RACE DISPLAY</span>
+          <div style={{ width: '1px', height: '32px', backgroundColor: t.border, margin: '0 8px' }} />
+          <span style={{ color: t.subtext, fontSize: '13px', letterSpacing: '2px' }}>LIVE RACE DISPLAY</span>
         </div>
 
         {/* Status pill */}
-        <div
-          className="px-6 py-2 rounded-full border-2 font-bold font-race tracking-widest text-lg"
-          style={{
-            borderColor: status.color,
-            color: status.color,
-            boxShadow: `0 0 15px ${status.color}44`,
-          }}
-        >
+        <div style={{ padding: '8px 24px', borderRadius: '999px', border: `2px solid ${status.color}`, color: status.color, fontWeight: 700, fontSize: '16px', letterSpacing: '3px', boxShadow: `0 0 15px ${status.color}44` }}>
           {status.label}
         </div>
 
-        {/* Date */}
-        <div className="text-gray-400 text-sm font-mono">
-          {now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+        {/* Right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <ThemeSwitcher />
+          <div style={{ color: t.subtext, fontSize: '13px', fontFamily: 'monospace' }}>
+            {now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </div>
         </div>
       </div>
 
       {/* ── MAIN BODY ── */}
-      <div className="flex flex-1 relative z-10 overflow-hidden">
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 10 }}>
 
-        {/* ── LEFT: LEADERBOARD ── */}
-        <div className="flex-1 flex flex-col p-4">
+        {/* ── LEADERBOARD ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px' }}>
 
-          {/* Section header */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-1 h-7 bg-f1red rounded glow-red" />
-            <span className="text-white font-bold text-xl tracking-widest font-race">
-              LIVE TIMING TOWER
-            </span>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ width: '4px', height: '28px', backgroundColor: t.accent, borderRadius: '2px', boxShadow: `0 0 10px ${t.accent}` }} />
+            <span style={{ color: t.text, fontWeight: 700, fontSize: '20px', letterSpacing: '6px' }}>LIVE TIMING TOWER</span>
             {raceStatus === 'active' && (
-              <div className="flex items-center gap-2 ml-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-green-400 text-xs tracking-wider">LIVE</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00ff88', boxShadow: '0 0 8px #00ff88', animation: 'pulse 1s infinite' }} />
+                <span style={{ color: '#00ff88', fontSize: '11px', letterSpacing: '2px' }}>LIVE</span>
               </div>
             )}
           </div>
 
           {/* Column headers */}
           {entries.length > 0 && (
-            <div
-              className="grid text-xs text-gray-500 font-bold tracking-widest px-4 mb-2 uppercase"
-              style={{ gridTemplateColumns: '3.5rem 1fr 7rem 9rem 9rem 8rem' }}
-            >
-              <span>POS</span>
-              <span>DRIVER</span>
-              <span className="text-center">LAPS</span>
-              <span className="text-center">BEST LAP</span>
-              <span className="text-center">TOTAL</span>
-              <span className="text-center">GAP</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '3.5rem 1fr 7rem 9rem 9rem 8rem', padding: '0 16px', marginBottom: '8px' }}>
+              {['POS', 'DRIVER', 'LAPS', 'BEST LAP', 'TOTAL', 'GAP'].map(h => (
+                <div key={h} style={{ color: t.subtext, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', textAlign: h === 'DRIVER' ? 'left' : 'center' }}>{h}</div>
+              ))}
             </div>
           )}
 
-          {/* Leaderboard rows */}
-          <div className="flex-1 space-y-2 overflow-y-auto">
+          {/* Rows */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {gappedEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <div className="text-8xl mb-6">🏎️</div>
-                <p className="text-gray-500 text-2xl font-race">Waiting for drivers...</p>
-                <p className="text-gray-700 text-sm mt-2">Add drivers from the admin panel</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: t.subtext }}>
+                <div style={{ fontSize: '80px', marginBottom: '24px' }}>🏎️</div>
+                <div style={{ fontSize: '24px', letterSpacing: '4px', fontWeight: 700 }}>Waiting for drivers...</div>
+                <div style={{ fontSize: '14px', marginTop: '8px', color: t.border }}>Add drivers from the admin panel</div>
               </div>
             ) : (
               gappedEntries.map((entry, index) => {
                 const isFastest = fastestLapEntry?.id === entry.id
-                const posColor = POSITION_COLORS[entry.position] || '#ffffff'
+                const posColor = POSITION_COLORS[entry.position] || t.text
                 const posChange = positionChanges[entry.id]
                 const isLeader = index === 0
 
                 return (
                   <div
                     key={entry.id}
-                    className={`
-                      grid items-center px-4 py-3 rounded-xl border transition-all
-                      card-3d row-slide-in
-                      ${isFastest ? 'fastest-lap-row border-f1purple' : 'border-darkborder bg-darkcard'}
-                      ${posChange === 'up' ? 'position-up' : ''}
-                      ${posChange === 'down' ? 'position-down' : ''}
-                      ${isLeader ? 'border-l-4' : ''}
-                    `}
+                    className={`row-slide-in ${isFastest ? 'fastest-lap-row' : ''} ${posChange === 'up' ? 'position-up' : ''} ${posChange === 'down' ? 'position-down' : ''}`}
                     style={{
+                      display: 'grid',
                       gridTemplateColumns: '3.5rem 1fr 7rem 9rem 9rem 8rem',
-                      animationDelay: `${index * 0.05}s`,
-                      borderLeftColor: isLeader ? entry.color : undefined,
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: `1px solid ${isFastest ? t.fastest : isLeader ? entry.color : t.border}`,
                       background: isFastest
-                        ? 'rgba(155,89,182,0.08)'
+                        ? `${t.fastest}15`
                         : isLeader
-                          ? `linear-gradient(90deg, ${entry.color}11, transparent)`
-                          : undefined,
+                          ? `linear-gradient(90deg, ${entry.color}15, ${t.card})`
+                          : t.card,
+                      animationDelay: `${index * 0.05}s`,
+                      transition: 'all 0.3s ease',
+                      boxShadow: isLeader ? `0 0 20px ${entry.color}22` : isFastest ? `0 0 20px ${t.fastest}22` : 'none',
                     }}
                   >
                     {/* Position */}
-                    <div
-                      className="text-3xl font-black font-race"
-                      style={{
-                        color: posColor,
-                        textShadow: entry.position <= 3 ? `0 0 15px ${posColor}` : undefined,
-                      }}
-                    >
+                    <div style={{ fontSize: '28px', fontWeight: 900, color: posColor, textShadow: entry.position <= 3 ? `0 0 15px ${posColor}` : 'none' }}>
                       <AnimatedNumber value={entry.position || index + 1} />
                     </div>
 
                     {/* Driver */}
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black border-2 flex-shrink-0"
-                        style={{
-                          backgroundColor: entry.color + '22',
-                          borderColor: entry.color,
-                          color: entry.color,
-                          boxShadow: `0 0 10px ${entry.color}44`,
-                        }}
-                      >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, border: `2px solid ${entry.color}`, backgroundColor: entry.color + '22', color: entry.color, flexShrink: 0, boxShadow: `0 0 10px ${entry.color}44` }}>
                         {entry.car_number || '?'}
                       </div>
                       <div>
-                        <div className="text-white font-bold text-xl leading-tight font-race">
-                          {entry.name}
-                        </div>
-                        <div className="text-gray-600 text-xs">{entry.avatar}</div>
+                        <div style={{ color: t.text, fontWeight: 700, fontSize: '20px', lineHeight: 1.1 }}>{entry.name}</div>
+                        <div style={{ color: t.subtext, fontSize: '12px' }}>{entry.avatar}</div>
                       </div>
                       {isFastest && (
-                        <span className="ml-2 text-xs bg-f1purple text-white px-2 py-0.5 rounded-full font-bold text-glow-purple">
+                        <div style={{ marginLeft: '8px', backgroundColor: t.fastest, color: '#fff', padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, boxShadow: `0 0 10px ${t.fastest}` }}>
                           ⚡ FASTEST
-                        </span>
+                        </div>
                       )}
-                      {posChange === 'up' && (
-                        <span className="text-green-400 text-sm font-bold">▲</span>
-                      )}
-                      {posChange === 'down' && (
-                        <span className="text-red-400 text-sm font-bold">▼</span>
-                      )}
+                      {posChange === 'up' && <span style={{ color: '#00ff88', fontWeight: 700 }}>▲</span>}
+                      {posChange === 'down' && <span style={{ color: '#ff4444', fontWeight: 700 }}>▼</span>}
                     </div>
 
                     {/* Laps */}
-                    <div className="text-center text-white font-black text-2xl font-mono">
+                    <div style={{ textAlign: 'center', color: t.text, fontWeight: 900, fontSize: '22px', fontFamily: 'monospace' }}>
                       <AnimatedNumber value={entry.lap_count || 0} />
                     </div>
 
                     {/* Best lap */}
-                    <div className={`text-center font-mono font-bold text-lg ${isFastest ? 'text-f1purple text-glow-purple' : 'text-white'}`}>
+                    <div style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, fontSize: '16px', color: isFastest ? t.fastest : t.text, textShadow: isFastest ? `0 0 10px ${t.fastest}` : 'none' }}>
                       {formatLapTime(entry.best_lap_ms)}
                     </div>
 
                     {/* Total time */}
-                    <div className="text-center font-mono text-sm text-gray-400">
+                    <div style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '14px', color: t.subtext }}>
                       {entry.total_time_ms ? formatLapTime(entry.total_time_ms) : '--'}
                     </div>
 
                     {/* Gap */}
-                    <div className={`text-center font-mono font-bold text-lg ${entry.gap === 'LEADER' ? 'text-f1gold text-glow-gold' : 'text-gray-300'}`}>
+                    <div style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, fontSize: '16px', color: entry.gap === 'LEADER' ? '#FFD700' : t.text, textShadow: entry.gap === 'LEADER' ? '0 0 10px rgba(255,215,0,0.6)' : 'none' }}>
                       {entry.gap || '--'}
                     </div>
                   </div>
@@ -490,81 +366,67 @@ export default function DisplayScreen() {
           </div>
         </div>
 
-        {/* ── RIGHT SIDEBAR ── */}
-        <div className="w-80 flex flex-col gap-3 p-4 border-l border-darkborder overflow-y-auto"
-          style={{ background: 'rgba(12,12,20,0.8)', backdropFilter: 'blur(10px)' }}>
+        {/* ── SIDEBAR ── */}
+        <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', borderLeft: `1px solid ${t.border}`, backgroundColor: t.card, overflowY: 'auto' }}>
 
           {/* Race Timer */}
-          <div className="bg-darkcard border border-darkborder rounded-xl p-4 card-3d">
-            <div className="text-gray-500 text-xs tracking-widest mb-2 font-bold">RACE TIME</div>
-            <div
-              className="text-5xl font-black font-mono tracking-wider"
-              style={{
-                color: timeLeft < 30 && raceStatus === 'active' ? '#e10600' : '#ffffff',
-                textShadow: timeLeft < 30 && raceStatus === 'active' ? '0 0 20px #e10600' : undefined,
-              }}
-            >
+          <div style={{ backgroundColor: t.bg, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px' }}>
+            <div style={{ color: t.subtext, fontSize: '10px', letterSpacing: '3px', marginBottom: '8px' }}>RACE TIME</div>
+            <div style={{ fontSize: '48px', fontWeight: 900, fontFamily: 'monospace', color: timeLeft < 30 && raceStatus === 'active' ? '#e10600' : t.text, textShadow: timeLeft < 30 && raceStatus === 'active' ? '0 0 20px #e10600' : 'none' }}>
               {formatCountdown(raceStatus === 'active' ? timeLeft : duration)}
             </div>
-            <div className="mt-3 h-2 bg-darkborder rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-1000"
-                style={{
-                  width: `${raceStatus === 'active' ? ((raceTimer / duration) * 100) : 0}%`,
-                  background: 'linear-gradient(90deg, #e10600, #ff4444)',
-                  boxShadow: '0 0 10px #e10600',
-                }}
-              />
+            <div style={{ marginTop: '8px', height: '4px', backgroundColor: t.border, borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: '2px', transition: 'width 1s linear', width: `${raceStatus === 'active' ? ((raceTimer / duration) * 100) : 0}%`, background: `linear-gradient(90deg, ${t.accent}, ${t.fastest})`, boxShadow: `0 0 8px ${t.accent}` }} />
             </div>
-            <div className="text-gray-600 text-xs mt-2 tracking-widest">
-              {raceStatus === 'active' ? 'RACE IN PROGRESS' : raceStatus?.toUpperCase()}
+            <div style={{ color: t.subtext, fontSize: '10px', letterSpacing: '2px', marginTop: '6px' }}>
+              {raceStatus === 'active' ? 'IN PROGRESS' : raceStatus?.toUpperCase()}
             </div>
           </div>
 
           {/* Fastest Lap */}
-          <div className="bg-darkcard border border-f1purple/50 rounded-xl p-4 card-3d glow-purple">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-f1purple" />
-              <div className="text-f1purple text-xs tracking-widest font-bold">FASTEST LAP</div>
+          <div style={{ backgroundColor: t.bg, border: `1px solid ${t.fastest}55`, borderRadius: '12px', padding: '16px', boxShadow: `0 0 15px ${t.fastest}22` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: t.fastest }} />
+              <div style={{ color: t.fastest, fontSize: '10px', letterSpacing: '3px', fontWeight: 700 }}>FASTEST LAP</div>
             </div>
             {fastestLapEntry ? (
               <>
-                <div className="text-3xl font-black font-mono text-f1purple text-glow-purple">
+                <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'monospace', color: t.fastest, textShadow: `0 0 15px ${t.fastest}` }}>
                   {formatLapTime(fastestLapEntry.best_lap_ms)}
                 </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xl">{fastestLapEntry.avatar}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '18px' }}>{fastestLapEntry.avatar}</span>
                   <div>
-                    <div className="text-white font-bold">{fastestLapEntry.name}</div>
-                    <div className="text-gray-500 text-xs">#{fastestLapEntry.car_number}</div>
+                    <div style={{ color: t.text, fontWeight: 700 }}>{fastestLapEntry.name}</div>
+                    <div style={{ color: t.subtext, fontSize: '11px' }}>#{fastestLapEntry.car_number}</div>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="text-gray-600 text-sm">No laps yet</div>
+              <div style={{ color: t.subtext, fontSize: '13px' }}>No laps yet</div>
             )}
           </div>
 
           {/* Hall of Fame */}
-          <div className="bg-darkcard border border-darkborder rounded-xl p-4 card-3d">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🏆</span>
-              <div className="text-gray-300 text-xs tracking-widest font-bold">HALL OF FAME</div>
+          <div style={{ backgroundColor: t.bg, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '16px' }}>🏆</span>
+              <div style={{ color: t.text, fontSize: '10px', letterSpacing: '3px', fontWeight: 700 }}>HALL OF FAME</div>
             </div>
             {hallOfFame.length === 0 ? (
-              <div className="text-gray-600 text-sm">No records yet</div>
+              <div style={{ color: t.subtext, fontSize: '12px' }}>No records yet</div>
             ) : (
-              <div className="space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {hallOfFame.slice(0, 5).map((record, i) => (
-                  <div key={record.id} className="flex items-center justify-between py-1 border-b border-darkborder last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
+                  <div key={record.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: `1px solid ${t.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '14px' }}>{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
                       <div>
-                        <div className="text-white text-sm font-bold">{record.name}</div>
-                        <div className="text-gray-600 text-xs truncate">{record.venue_name}</div>
+                        <div style={{ color: t.text, fontSize: '13px', fontWeight: 700 }}>{record.name}</div>
+                        <div style={{ color: t.subtext, fontSize: '10px' }}>{record.venue_name}</div>
                       </div>
                     </div>
-                    <span className="text-f1purple font-mono text-sm font-bold flex-shrink-0 ml-2">
+                    <span style={{ color: t.fastest, fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}>
                       {formatLapTime(record.lap_time_ms)}
                     </span>
                   </div>
@@ -573,78 +435,71 @@ export default function DisplayScreen() {
             )}
           </div>
 
-          {/* Recent Races */}
-          <div className="bg-darkcard border border-darkborder rounded-xl p-4 card-3d">
-            <div className="text-gray-300 text-xs tracking-widest font-bold mb-3">RECENT RACES</div>
-            {raceHistory.length === 0 ? (
-              <div className="text-gray-600 text-sm">No races yet</div>
-            ) : (
-              <div className="space-y-2">
-                {raceHistory.slice(0, 3).map((race) => (
-                  <div key={race.id} className="flex justify-between items-center py-1 border-b border-darkborder last:border-0">
-                    <span className="text-gray-400 text-xs truncate">{race.venue_name}</span>
-                    <span className="text-gray-600 text-xs font-mono ml-2 flex-shrink-0">
-                      {new Date(race.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Driver of the Day */}
+          {(raceStatus === 'completed' || raceStatus === 'podium') && entries.length > 0 && (
+            <DriverOfTheDay entries={entries} raceStatus={raceStatus} />
+          )}
 
           {/* Venue Partner */}
-          <div className="bg-darkcard border border-darkborder rounded-xl p-4 text-center card-3d">
-            <div className="text-gray-600 text-xs tracking-widest mb-2">VENUE PARTNER</div>
+          <div style={{ backgroundColor: t.bg, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+            <div style={{ color: t.subtext, fontSize: '10px', letterSpacing: '3px', marginBottom: '8px' }}>VENUE PARTNER</div>
             {activeRace?.venue_logo_url ? (
-              <img src={activeRace.venue_logo_url} alt="Venue" className="h-12 mx-auto object-contain" />
+              <img src={activeRace.venue_logo_url} alt="Venue" style={{ height: '48px', margin: '0 auto', objectFit: 'contain' }} />
             ) : (
-              <div className="text-gray-400 font-bold font-race text-lg">
+              <div style={{ color: t.text, fontWeight: 700, fontSize: '16px' }}>
                 {activeRace?.venue_name || 'RaceZone Arena'}
               </div>
             )}
           </div>
 
           {/* QR Code */}
-          <div className="bg-darkcard border border-darkborder rounded-xl p-4 text-center card-3d">
-            <div className="text-gray-600 text-xs tracking-widest mb-3">SCAN TO BOOK</div>
-            <div className="flex justify-center">
+          <div style={{ backgroundColor: t.bg, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+            <div style={{ color: t.subtext, fontSize: '10px', letterSpacing: '3px', marginBottom: '12px' }}>SCAN TO BOOK</div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <QRCodeSVG
                 value={import.meta.env.VITE_BOOKING_URL || 'https://racezone.in'}
                 size={90}
                 bgColor="transparent"
-                fgColor="#ffffff"
+                fgColor={t.text}
                 level="M"
               />
             </div>
-            <div className="text-gray-600 text-xs mt-2">racezone.in</div>
+            <div style={{ color: t.subtext, fontSize: '11px', marginTop: '8px' }}>racezone.in</div>
           </div>
         </div>
       </div>
-      
-      {/* Share button — shows after race */}
+
+      {/* ── BOTTOM TICKER ── */}
+      <div style={{ borderTop: `1px solid ${t.border}`, backgroundColor: t.card, height: '32px', overflow: 'hidden', position: 'relative', zIndex: 10 }}>
+        <div className="ticker-content" style={{ display: 'flex', alignItems: 'center', height: '100%', color: t.subtext, fontSize: '11px', letterSpacing: '3px', fontWeight: 700 }}>
+          🏎️ RACEZONE RC RACING &nbsp;·&nbsp; LIVE TIMING SYSTEM &nbsp;·&nbsp;
+          BOOK YOUR EVENT: racezone.in &nbsp;·&nbsp; 🏁 THE ULTIMATE RC RACING EXPERIENCE &nbsp;·&nbsp;
+          {activeRace?.venue_name && `NOW RACING AT: ${activeRace.venue_name.toUpperCase()} · `}
+          FASTEST LAP: {fastestLapEntry ? `${fastestLapEntry.name} — ${formatLapTime(fastestLapEntry.best_lap_ms)}` : 'TBD'}
+          &nbsp;·&nbsp; 🏎️
+        </div>
+      </div>
+
+      {/* Share button */}
       {(raceStatus === 'completed' || raceStatus === 'podium') && entries.length > 0 && (
-        <div className="relative z-10 flex justify-center py-3 border-t border-darkborder">
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px', borderTop: `1px solid ${t.border}`, backgroundColor: t.card, zIndex: 10 }}>
           <button
             onClick={() => setShowShareCard(true)}
-            className="px-8 py-3 bg-f1red hover:bg-red-700 text-white font-black font-race text-lg tracking-widest rounded-full transition-all glow-red animate-pulse"
+            style={{ padding: '12px 32px', backgroundColor: t.accent, color: '#fff', fontWeight: 900, fontSize: '16px', letterSpacing: '4px', borderRadius: '999px', border: 'none', cursor: 'pointer', boxShadow: `0 0 20px ${t.accent}66`, fontFamily: 'Rajdhani, sans-serif' }}
           >
             📸 SHARE YOUR RESULT
           </button>
         </div>
       )}
 
-      {/* ── BOTTOM TICKER ── */}
-      <div className="relative z-10 border-t border-darkborder overflow-hidden"
-        style={{ background: 'rgba(225,6,0,0.15)', height: '32px' }}>
-        <div className="ticker-content flex items-center h-full text-gray-400 text-xs font-race tracking-widest">
-          🏎️ RACEZONE RC RACING &nbsp;·&nbsp; LIVE TIMING SYSTEM &nbsp;·&nbsp;
-          BOOK YOUR EVENT: racezone.in &nbsp;·&nbsp;
-          🏁 THE ULTIMATE RC RACING EXPERIENCE &nbsp;·&nbsp;
-          {activeRace?.venue_name && `NOW RACING AT: ${activeRace.venue_name.toUpperCase()} · `}
-          FASTEST LAP: {fastestLapEntry ? `${fastestLapEntry.name} — ${formatLapTime(fastestLapEntry.best_lap_ms)}` : 'TBD'}
-          &nbsp;·&nbsp; 🏎️
-        </div>
-      </div>
+      {/* Share Card Modal */}
+      {showShareCard && (
+        <ShareCard
+          entries={entries}
+          activeRace={activeRace}
+          onClose={() => setShowShareCard(false)}
+        />
+      )}
     </div>
   )
 }

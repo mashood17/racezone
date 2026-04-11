@@ -4,19 +4,38 @@ import { themes } from '../../styles/themes'
 export default function ThemeSwitcher() {
   const { theme, setTheme } = useRace()
 
+  const icons = {
+    night: '🌙',
+    f1blue: '🔵',
+    classic: '🏁',
+    neon: '⚡',
+  }
+
   return (
-    <div className="flex gap-2">
+    <div className="flex items-center gap-1">
       {Object.entries(themes).map(([key, t]) => (
         <button
           key={key}
-          onClick={() => setTheme(key)}
-          className={`px-3 py-1 rounded text-xs font-bold border transition-all ${
-            theme === key
-              ? 'border-f1red bg-f1red text-white'
-              : 'border-gray-600 text-gray-400 hover:border-gray-400'
-          }`}
+          onClick={(e) => {
+            e.stopPropagation()
+            setTheme(key)
+          }}
+          title={t.name}
+          style={{
+            padding: '6px 10px',
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '1px',
+            cursor: 'pointer',
+            border: `2px solid ${theme === key ? t.accent : '#333'}`,
+            backgroundColor: theme === key ? t.accent + '33' : 'transparent',
+            color: theme === key ? t.accent : '#666',
+            transition: 'all 0.2s',
+            fontFamily: 'Rajdhani, sans-serif',
+          }}
         >
-          {t.name}
+          {icons[key]} {t.name}
         </button>
       ))}
     </div>

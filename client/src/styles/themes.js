@@ -9,6 +9,16 @@ export const themes = {
     subtext: '#8888aa',
     fastest: '#9b59b6',
   },
+  f1blue: {
+    name: 'F1 Blue',
+    bg: '#00001a',
+    card: '#000533',
+    border: '#0033aa',
+    accent: '#00d2ff',
+    text: '#ffffff',
+    subtext: '#aaccff',
+    fastest: '#ff00aa',
+  },
   classic: {
     name: 'Classic',
     bg: '#1a1a2e',

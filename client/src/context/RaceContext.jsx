@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
+import { themes } from '../styles/themes'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
-
 const RaceContext = createContext(null)
 
 export const RaceProvider = ({ children }) => {
@@ -12,6 +12,21 @@ export const RaceProvider = ({ children }) => {
   const [hallOfFame, setHallOfFame] = useState([])
   const [raceHistory, setRaceHistory] = useState([])
   const [theme, setTheme] = useState('night')
+
+  // Apply theme to document root
+  useEffect(() => {
+    const t = themes[theme]
+    if (!t) return
+    const root = document.documentElement
+    root.style.setProperty('--color-bg', t.bg)
+    root.style.setProperty('--color-card', t.card)
+    root.style.setProperty('--color-border', t.border)
+    root.style.setProperty('--color-accent', t.accent)
+    root.style.setProperty('--color-text', t.text)
+    root.style.setProperty('--color-subtext', t.subtext)
+    root.style.setProperty('--color-fastest', t.fastest)
+    document.body.style.backgroundColor = t.bg
+  }, [theme])
 
   const fetchActiveRace = useCallback(async () => {
     try {
