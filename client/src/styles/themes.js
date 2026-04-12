@@ -1,42 +1,34 @@
 export const themes = {
-  night: {
-    name: 'Night Race',
-    bg: '#0a0a0f',
-    card: '#12121a',
-    border: '#1e1e2e',
-    accent: '#e10600',
-    text: '#ffffff',
-    subtext: '#8888aa',
-    fastest: '#9b59b6',
+  premium: {
+    name: 'Premium Neon',
+    bg: '#0A1F44', // deep royal blue
+    card: 'rgba(20, 30, 80, 0.6)', // glass effect
+    border: 'rgba(0, 123, 255, 0.3)',
+    accent: '#007BFF', // electric blue
+    text: '#FFFFFF',
+    subtext: '#AFCBFF',
+    fastest: '#6A0DAD', // purple
   },
-  f1blue: {
-    name: 'F1 Blue',
-    bg: '#00001a',
-    card: '#000533',
-    border: '#0033aa',
-    accent: '#00d2ff',
-    text: '#ffffff',
-    subtext: '#aaccff',
-    fastest: '#ff00aa',
+
+  neonPro: {
+    name: 'Arcade Neon',
+    bg: '#0B0F2A',
+    card: 'rgba(30, 40, 100, 0.5)',
+    border: 'rgba(106, 13, 173, 0.4)',
+    accent: '#6A0DAD',
+    text: '#EAEAEA',
+    subtext: '#C3B6FF',
+    fastest: '#00D4FF',
   },
-  classic: {
-    name: 'Classic',
-    bg: '#1a1a2e',
-    card: '#16213e',
-    border: '#0f3460',
-    accent: '#e94560',
-    text: '#eaeaea',
-    subtext: '#8899aa',
-    fastest: '#00d2be',
-  },
-  neon: {
-    name: 'Neon City',
-    bg: '#050510',
-    card: '#0d0d1f',
-    border: '#00ff88',
-    accent: '#00ff88',
-    text: '#ffffff',
-    subtext: '#66ffaa',
-    fastest: '#ff00ff',
-  },
+
+  blueElite: {
+    name: 'Blue Elite',
+    bg: '#071A3A',
+    card: 'rgba(10, 40, 90, 0.6)',
+    border: 'rgba(0, 123, 255, 0.25)',
+    accent: '#00D4FF',
+    text: '#FFFFFF',
+    subtext: '#B0D8FF',
+    fastest: '#7B61FF',
+  }
 }

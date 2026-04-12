@@ -9,10 +9,38 @@
 }
 
 body {
-  background-color: #0a0a0f;
+  background: linear-gradient(135deg, #0A1F44, #0B0F2A, #1a0f3a);
   color: #ffffff;
   font-family: 'Rajdhani', sans-serif;
   overflow-x: hidden;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 123, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 123, 255, 0.2);
+  border-radius: 14px;
+}
+
+.glow-red { box-shadow: 0 0 20px rgba(0, 123, 255, 0.6); }
+.glow-purple { box-shadow: 0 0 25px rgba(106, 13, 173, 0.6); }
+.text-glow-red { text-shadow: 0 0 20px rgba(0, 123, 255, 0.8); }
+
+.speed-line {
+  background: linear-gradient(90deg, transparent, #00D4FF, transparent);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 123, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(106, 13, 173, 0.08) 1px, transparent 1px);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 10px 40px rgba(0, 123, 255, 0.3);
+  transition: all 0.3s ease;
 }
 
 /* ── SCROLLBAR ── */
