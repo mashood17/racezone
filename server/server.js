@@ -21,6 +21,7 @@ const allowedOrigins = [
   'https://racezone-hrwxtj4ny-mashood17s-projects.vercel.app',
   'https://racezone-9e9cdikkk-mashood17s-projects.vercel.app',
   'https://racezone-git-main-mashood17s-projects.vercel.app',
+  'https://racezone.vercel.app',
   process.env.CLIENT_URL,
 ].filter(Boolean)
 
